@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 
@@ -56,6 +56,34 @@ class VisionResult(BaseModel):
     confidence: float = Field(ge=0, le=1)
     position: str
     recommendation: str
+
+
+class Detection(BaseModel):
+    defect_type: str
+    confidence: float = Field(ge=0, le=1)
+    position: str
+    bbox_xyxy: list[float] | None = None
+
+
+class VisionInferenceResponse(BaseModel):
+    model_path: str
+    image_name: str
+    width: int
+    height: int
+    detections: list[Detection]
+
+
+class InspectionRequest(BaseModel):
+    detections: list[Detection] = Field(min_length=1, max_length=50)
+    question: str = "请基于检测结果和知识库给出缺陷分析、处置建议与依据。"
+    top_k: int = Field(default=5, ge=1, le=10)
+
+
+class DocumentMetadata(BaseModel):
+    device_type: str | None = None
+    defect_type: str | None = None
+    document_version: str | None = None
+    extra: dict[str, Any] = Field(default_factory=dict)
 
 
 class DocumentSummary(BaseModel):

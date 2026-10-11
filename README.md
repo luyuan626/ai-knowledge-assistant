@@ -2,16 +2,16 @@
 
 一个可运行的全栈 AI 应用：既可以作为通用 DeepSeek 对话助手，也可以基于上传的 PDF、TXT、Markdown 文档进行带来源页码的知识库问答。视觉检测、OCR、设备告警等结构化结果可通过统一 JSON 接口接入后续分析流程。
 
-> 项目坚持“实现什么，就展示什么”：当前版本使用 SQLite 本地检索实现开箱可运行；Milvus、BGE-M3、Reranker 等不属于当前已落地依赖，见文末扩展方向。
+> 项目坚持“实现什么，就展示什么”：SQLite 仅保存文档、来源页码与元数据；稠密向量由 BGE-M3 编码并持久化到 Milvus Lite。首次检索会下载模型并为已有片段建索引。
 
 ## 在线能力
 
 - **通用问答**：调用 OpenAI-compatible 模型网关；已在 AutoDL 以 DeepSeek 实际验证。
 - **知识库问答**：上传 PDF / TXT / Markdown，按页解析与切分，回答返回引用片段、文档名和页码。
-- **可解释检索**：展示词项相关度、确定性语义代理分数与最终排序分，便于排查“为什么命中这段内容”。
+- **真实混合检索**：BM25 与 BGE-M3/Milvus 并行召回，RRF 融合候选后由 BGE-Reranker 精排；页面展示每段的四阶段得分。
 - **会话体验**：支持最近 6 轮上下文理解，页面渲染加粗、换行、代码等基础 Markdown 格式。
-- **通用结构化输入**：提供视觉检测结果接入接口，可用于目标检测、OCR、设备告警或业务表单结果校验。
-- **工程化边界**：敏感配置仅通过 `.env` 注入；每次问答返回 `trace_id` 和耗时；没有人工标注评测集时不展示虚构 Recall@K / MRR。
+- **YOLO 与报告链路**：支持使用配置的 Ultralytics `.pt` 权重进行图片推理；检测类别、位置与置信度可作为检索过滤和报告生成上下文。
+- **评测边界**：提供固定人工标注演示集，实际计算 Recall@5、MRR、引用正确率及 P95 检索时延；业务效果须替换为对应领域的人工标注集后重新评测。
 
 ## 架构
 
@@ -42,7 +42,8 @@
 | 前端 | Vue 3、Vite、原生 Fetch API |
 | 后端 | Python 3.10+、FastAPI、Uvicorn、Pydantic |
 | 文档处理 | PyMuPDF（PDF）、TXT / Markdown 文本读取 |
-| 本地存储与检索 | SQLite、词项重叠评分、可解释排序分数 |
+| 元数据与检索 | SQLite 元数据、BM25、Milvus Lite、BGE-M3、RRF、BGE-Reranker |
+| 视觉模型 | Ultralytics YOLO（通过 `YOLO_MODEL_PATH` 挂载已验证 `.pt` 权重） |
 | 大模型 | OpenAI-compatible Chat Completions；已验证 DeepSeek |
 | 部署 | Docker Compose；AutoDL 上以 `nohup + Uvicorn` 运行 |
 
@@ -152,21 +153,38 @@ chmod +x deploy/*.sh
 - 日志：`run/uvicorn.log`
 - 停止：`./deploy/stop.sh`
 
+### 首次模型索引与评测
+
+在已配置 GPU 的服务器启动后，首次检索将下载 BGE-M3、BGE-Reranker 并构建 Milvus Lite 索引。模型权重和向量索引不进入 Git。索引完成后可在 Swagger 调用：
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/evaluation/run
+```
+
+返回值中的 Recall@5、MRR、引用正确率与 P95 仅对应 `backend/app/seed_eval.json` 这套固定标注样例；上传工业资料后，请新增相同格式的人工标注集重跑。
+
+### YOLO 接入
+
+将**自己已验证**的权重放在 Git 忽略目录，并在服务器 `.env` 中配置：
+
+```dotenv
+YOLO_MODEL_PATH=/absolute/path/to/best.pt
+YOLO_DEVICE=0
+```
+
+随后使用 `POST /api/vision/infer` 上传图像；`POST /api/reports/inspection` 可接收其结构化检测结果，按照缺陷类别筛选知识库并生成带引用的分析。
+
 ## 当前边界与后续扩展
 
-当前仓库优先保证轻量、可运行、可解释。以下方向**尚未作为当前实现或项目成果宣称**：
+当前仓库已经实现 BGE-M3/Milvus/BM25/RRF/BGE-Reranker 链路、YOLO 推理接口和固定标注评测；但它仍是单机工程样例。以下能力**未实现，不应写入简历**：
 
-- 用 BGE-M3 替换本地确定性语义代理；
-- 使用 Milvus / pgvector 存储大规模向量；
-- 接入 BM25 倒排召回、RRF 融合与 BGE-Reranker；
-- 基于人工标注问题集计算 Recall@K、MRR、引用正确率；
-- 引入 Redis 会话缓存、MySQL 多租户知识库和异步文档解析队列。
-
-这些方向已经保留了 API 与页面扩展位置，但应在真正实现、部署与评测后再写入简历。
+- Redis 会话缓存、MySQL 多租户知识库和异步文档解析队列；
+- 分布式 Milvus 集群、权限体系、灰度发布及生产级监控；
+- 钢丝绳业务指标：除非使用实际 `best.pt` 与人工标注的规范语料完成验证，否则不能宣称缺陷报告准确率或工业现场效果。
 
 ## 简历表述
 
-**通用 AI 问答与知识库助手｜全栈开发**：基于 FastAPI 与 Vue 3 实现 PDF/TXT/Markdown 解析、按页文本切分、SQLite 本地检索和可追溯问答链路；接入 DeepSeek 兼容模型接口，设计“通用问答 / 知识库问答”双模式与结构化视觉结果适配接口，返回引用片段、页码、Trace ID 与响应耗时；完成 Docker 与 AutoDL 部署。
+**通用 AI 问答与知识库助手｜全栈开发**：基于 FastAPI 与 Vue 3 实现 PDF/TXT/Markdown 按页解析、标题感知父子分块与元数据管理；采用 BM25 与 BGE-M3/Milvus 进行混合召回，经 RRF 融合和 BGE-Reranker 精排，返回可追溯证据片段、页码、Trace ID 与耗时；接入 Ultralytics YOLO 图片推理，将检测结构化结果用于知识库过滤与报告上下文，并完成固定标注集上的 Recall@5、MRR、引用正确率及 P95 检索时延评测。
 
 ## License
 

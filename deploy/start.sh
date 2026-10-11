@@ -2,6 +2,7 @@
 set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+VENV_DIR="${VENV_DIR:-$PROJECT_DIR/.venv}"
 PID_FILE="$PROJECT_DIR/run/uvicorn.pid"
 LOG_FILE="$PROJECT_DIR/run/uvicorn.log"
 
@@ -22,7 +23,7 @@ if [[ -f "$PID_FILE" ]] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
 fi
 
 cd "$PROJECT_DIR/backend"
-nohup "$PROJECT_DIR/.venv/bin/uvicorn" app.main:app --host 0.0.0.0 --port 8000 \
+nohup "$VENV_DIR/bin/uvicorn" app.main:app --host 0.0.0.0 --port 8000 \
   > "$LOG_FILE" 2>&1 &
 echo $! > "$PID_FILE"
 echo "Started on http://127.0.0.1:8000 (PID $(cat "$PID_FILE"))."

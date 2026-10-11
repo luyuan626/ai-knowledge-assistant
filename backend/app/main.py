@@ -1,28 +1,22 @@
 from __future__ import annotations
 
-from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
-import fitz
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from .config import CORS_ORIGINS, ROOT_DIR, UPLOAD_DIR
-from .models import QueryRequest, QueryResponse, RetrievalRequest, ChunkRecord, VisionResult, DocumentSummary
-from .rag import answer, split_text
+from .models import InspectionRequest, QueryRequest, QueryResponse, RetrievalRequest, ChunkRecord, VisionInferenceResponse, VisionResult, DocumentSummary
+from .rag import answer
 from .store import KnowledgeStore
+from .document_parser import parse_document
+from .evaluation import load_evaluation, run_retrieval_evaluation
+from .vision import infer_image
 
 app = FastAPI(title="RAG 智能问答助手", version="1.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 store = KnowledgeStore()
-
-
-def extract_pages(file_path: Path) -> list[tuple[int, str]]:
-    if file_path.suffix.lower() == ".pdf":
-        document = fitz.open(file_path)
-        return [(number + 1, page.get_text("text")) for number, page in enumerate(document)]
-    return [(1, file_path.read_text(encoding="utf-8", errors="ignore"))]
 
 
 @app.get("/health")
@@ -36,18 +30,16 @@ def documents():
 
 
 @app.post("/api/documents", status_code=201)
-async def upload_document(file: UploadFile = File(...)):
+async def upload_document(file: UploadFile = File(...), device_type: str | None = Form(None), defect_type: str | None = Form(None), document_version: str | None = Form(None)):
     suffix = Path(file.filename or "").suffix.lower()
     if suffix not in {".pdf", ".txt", ".md"}:
         raise HTTPException(400, "仅支持 PDF、TXT、MD 文档")
     target = UPLOAD_DIR / f"{uuid4().hex}{suffix}"
     target.write_bytes(await file.read())
-    chunks = []
-    for page, text in extract_pages(target):
-        chunks.extend((page, part) for part in split_text(text) if len(part.strip()) > 30)
+    chunks = [chunk for chunk in parse_document(target) if len(chunk["content"].strip()) > 30]
     if not chunks:
         raise HTTPException(400, "未从文档中解析到可用文本")
-    return store.add_document(file.filename or target.name, suffix.lstrip("."), chunks)
+    return store.add_document(file.filename or target.name, suffix.lstrip("."), chunks, {"device_type": device_type or "", "defect_type": defect_type or "", "document_version": document_version or ""})
 
 
 @app.post("/api/chat", response_model=QueryResponse)
@@ -66,9 +58,32 @@ def analyze_vision(result: VisionResult):
     return result
 
 
+@app.post("/api/vision/infer", response_model=VisionInferenceResponse)
+async def infer_vision(file: UploadFile = File(...), confidence: float = Form(0.25)):
+    if not (file.content_type or "").startswith("image/"):
+        raise HTTPException(400, "仅支持图像文件")
+    try:
+        return infer_image(file.filename or "image.jpg", await file.read(), confidence)
+    except RuntimeError as exc:
+        raise HTTPException(503, str(exc)) from exc
+
+
+@app.post("/api/reports/inspection", response_model=QueryResponse)
+async def inspection_report(request: InspectionRequest):
+    categories = sorted({item.defect_type for item in request.detections})
+    visual_context = "\n".join(f"- 类别：{item.defect_type}；置信度：{item.confidence:.2%}；位置：{item.position}" for item in request.detections)
+    filters = {"defect_type": categories[0]} if len(categories) == 1 else None
+    return await answer(request.question, store, request.top_k, [], "knowledge", filters=filters, visual_context=visual_context)
+
+
 @app.get("/api/evaluation/summary")
 def evaluation_summary():
-    return {"retrieval_recall_at_5": None, "mrr": None, "citation_precision": None, "message": "指标需要基于人工标注的评测集计算；当前页面不伪造离线评测结果。", "updated_at": datetime.now().isoformat()}
+    return load_evaluation()
+
+
+@app.post("/api/evaluation/run")
+def run_evaluation():
+    return run_retrieval_evaluation(store)
 
 
 # The production package copies the Vite build here, so one Uvicorn process can

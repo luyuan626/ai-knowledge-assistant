@@ -1,4 +1,8 @@
 [
-  {"query": "RAG 如何提高检索结果相关性？", "expected_document": "工业视觉质检知识库示例"},
-  {"query": "视觉质检结果怎样可追溯？", "expected_document": "工业视觉质检知识库示例"}
+  {"question":"视觉质检结果如何保证可追溯？","relevant_sources":[{"document_name":"工业视觉质检知识库示例","page":1}]},
+  {"question":"部署质检系统需要记录哪些信息？","relevant_sources":[{"document_name":"工业视觉质检知识库示例","page":1}]},
+  {"question":"RAG 怎样融合关键词和向量检索结果？","relevant_sources":[{"document_name":"工业视觉质检知识库示例","page":2}]},
+  {"question":"什么是 RRF，它在检索链路中有什么作用？","relevant_sources":[{"document_name":"工业视觉质检知识库示例","page":2}]},
+  {"question":"知识库文档应保存哪些元数据？","relevant_sources":[{"document_name":"工业视觉质检知识库示例","page":3}]},
+  {"question":"回答如何提供可核验的文档来源？","relevant_sources":[{"document_name":"工业视觉质检知识库示例","page":3}]}
 ]

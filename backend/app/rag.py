@@ -89,11 +89,15 @@ async def answer(
     top_k: int,
     history: list[ChatTurn] | None = None,
     response_mode: str = "knowledge",
+    filters: dict | None = None,
+    visual_context: str = "",
 ) -> dict:
     started = time.perf_counter()
-    results = store.search(question, top_k)
+    results = store.search(question, top_k, filters=filters)
     evidence = select_evidence(results)
     context = build_context(evidence)
+    if visual_context:
+        context = f"检测结构化上下文：\n{visual_context}\n\n{context}"
     llm_answer = await ask_llm(question, context, history or [], response_mode) if (evidence or response_mode == "general") else None
     if llm_answer:
         text, mode = llm_answer, "llm"

@@ -41,4 +41,11 @@ export async function evaluation() {
   catch { return { retrieval_recall_at_5: null, mrr: null, citation_precision: null, message: '本地演示未加载人工标注评测集，不展示虚构指标。', updated_at: now() } }
 }
 
+export async function runEvaluation() { return request('/api/evaluation/run', { method: 'POST' }) }
+
+export async function inferVision(file, confidence = 0.25) {
+  const body = new FormData(); body.append('file', file); body.append('confidence', String(confidence))
+  return request('/api/vision/infer', { method: 'POST', body })
+}
+
 export { hasLocalApi }
