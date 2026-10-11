@@ -1,0 +1,4 @@
+[
+  {"query": "RAG 如何提高检索结果相关性？", "expected_document": "工业视觉质检知识库示例"},
+  {"query": "视觉质检结果怎样可追溯？", "expected_document": "工业视觉质检知识库示例"}
+]

@@ -1,0 +1,27 @@
+services:
+  api:
+    build:
+      context: ./backend
+    environment:
+      CORS_ORIGINS: http://localhost:5174,http://localhost:8088
+      # Fill these only when connecting an OpenAI-compatible model gateway.
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+    ports:
+      - "8000:8000"
+    volumes:
+      - assistant_data:/app/data
+      - assistant_uploads:/app/uploads
+
+  web:
+    build:
+      context: ./frontend
+    depends_on:
+      - api
+    ports:
+      - "8088:80"
+
+volumes:
+  assistant_data:
+  assistant_uploads:
