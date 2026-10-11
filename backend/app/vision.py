@@ -9,6 +9,16 @@ from .config import UPLOAD_DIR, YOLO_DEVICE, YOLO_MODEL_PATH
 _model = None
 
 
+def _install_checkpoint_compatibility():
+    """Expose the small set of custom layers required by bundled YOLO checkpoints."""
+    import ultralytics.nn as ultralytics_nn
+
+    compatibility_path = Path(__file__).parent / "yolo_compat" / "ultralytics" / "nn"
+    path_value = str(compatibility_path)
+    if path_value not in ultralytics_nn.__path__:
+        ultralytics_nn.__path__.append(path_value)
+
+
 def _load_model():
     global _model
     if not YOLO_MODEL_PATH:
@@ -16,6 +26,7 @@ def _load_model():
     if not Path(YOLO_MODEL_PATH).is_file():
         raise RuntimeError("YOLO_MODEL_PATH 不存在或不可读取。")
     if _model is None:
+        _install_checkpoint_compatibility()
         from ultralytics import YOLO
         _model = YOLO(YOLO_MODEL_PATH)
     return _model

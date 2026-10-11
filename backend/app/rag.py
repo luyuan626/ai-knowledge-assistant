@@ -108,6 +108,10 @@ async def answer(
     elif response_mode == "general":
         text, mode = "模型服务暂时不可用，无法生成通用回答。请稍后重试。", "demo"
     else:
-        text, mode = "现有知识库没有检索到足够相关的材料，暂时无法给出可靠结论。请上传或补充相关文档后重试。", "demo"
+        if visual_context:
+            text = f"已接收到以下检测结果：\n{visual_context}\n\n但现有知识库没有检索到足够相关的规范或处置材料，因此暂不生成缺陷原因和处置建议。请上传对应的设备手册、质检规范或历史报告后重试。"
+        else:
+            text = "现有知识库没有检索到足够相关的材料，暂时无法给出可靠结论。请上传或补充相关文档后重试。"
+        mode = "demo"
     citations = [{"chunk_id": item["id"], "document_name": item["document_name"], "page": item["page"], "score": round(item["rerank_score"], 4), "content": item["content"]} for item in evidence]
     return {"answer": text, "citations": citations, "trace_id": f"trace_{uuid4().hex[:12]}", "mode": mode, "answer_scope": response_mode, "elapsed_ms": int((time.perf_counter() - started) * 1000)}
