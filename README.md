@@ -13,6 +13,10 @@
 - **YOLO 与报告链路**：支持使用配置的 Ultralytics `.pt` 权重进行图片推理；检测类别、位置与置信度可作为检索过滤和报告生成上下文。
 - **评测边界**：提供固定人工标注演示集，实际计算 Recall@5、MRR、引用正确率及 P95 检索时延；业务效果须替换为对应领域的人工标注集后重新评测。
 
+### 当前验证快照（AutoDL，2026-10-11）
+
+在 RTX 3080 Ti、Python 3.12 环境下，已完成本地 BGE-M3 与 BGE-Reranker 权重加载、Milvus Lite 建库和端到端检索验证。使用仓库内 `seed_eval.json` 的 6 条固定人工标注演示样例，得到 **Recall@5=1.000、MRR=1.000、引用正确率=0.3333、P95 检索时延=83.61 ms**。该数据集规模很小，只用于验证评测链路可运行，不能外推为真实工业场景效果。
+
 ## 架构
 
 ```text
@@ -117,7 +121,10 @@ docker compose up --build
 | `POST` | `/api/chat` | 通用或知识库问答 |
 | `POST` | `/api/retrieval` | 查看当前检索与排序结果 |
 | `POST` | `/api/vision/analyze` | 校验视觉模型结构化结果 |
+| `POST` | `/api/vision/infer` | 使用已配置的 YOLO 权重进行图片推理 |
+| `POST` | `/api/reports/inspection` | 将检测结果和检索证据组织为质检报告 |
 | `GET` | `/api/evaluation/summary` | 读取评测状态与边界说明 |
+| `POST` | `/api/evaluation/run` | 运行固定标注集的检索评测 |
 
 `/api/chat` 请求示例：
 
