@@ -71,8 +71,9 @@ class HybridKnowledgeStore:
             except ImportError as exc:
                 raise RuntimeError("缺少 FlagEmbedding 依赖，请按 backend/requirements.txt 安装后重试。") from exc
             fp16 = RAG_DEVICE.startswith("cuda")
-            self._embedder = BGEM3FlagModel(RAG_EMBEDDING_MODEL, use_fp16=fp16, devices=RAG_DEVICE)
-            self._reranker = FlagReranker(RAG_RERANKER_MODEL, use_fp16=fp16, devices=RAG_DEVICE)
+            devices = [RAG_DEVICE] if RAG_DEVICE and RAG_DEVICE != "auto" else None
+            self._embedder = BGEM3FlagModel(RAG_EMBEDDING_MODEL, use_fp16=fp16, devices=devices)
+            self._reranker = FlagReranker(RAG_RERANKER_MODEL, use_fp16=fp16, devices=devices)
 
     def _milvus_client(self):
         if self._milvus is not None:

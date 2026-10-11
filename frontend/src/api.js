@@ -18,8 +18,9 @@ export async function listDocuments() {
   try { return await request('/api/documents') } catch { return seededDocs }
 }
 
-export async function uploadDocument(file) {
+export async function uploadDocument(file, metadata = {}) {
   const body = new FormData(); body.append('file', file)
+  for (const [key, value] of Object.entries(metadata)) if (value?.trim()) body.append(key, value.trim())
   return request('/api/documents', { method: 'POST', body })
 }
 
@@ -46,6 +47,10 @@ export async function runEvaluation() { return request('/api/evaluation/run', { 
 export async function inferVision(file, confidence = 0.25) {
   const body = new FormData(); body.append('file', file); body.append('confidence', String(confidence))
   return request('/api/vision/infer', { method: 'POST', body })
+}
+
+export async function generateInspectionReport(detections, question) {
+  return request('/api/reports/inspection', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ detections, question, top_k: 5 }) })
 }
 
 export { hasLocalApi }
